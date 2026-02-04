@@ -14,6 +14,7 @@ enum LibrarySection: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @ObservedObject private var store = SettingsStore.shared
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedID: UUID?
     @State private var hoveredID: UUID?
     @State private var isDropTargeted = false
@@ -25,12 +26,20 @@ struct ContentView: View {
         GridItem(.adaptive(minimum: 170), spacing: 16)
     ]
 
+    private var isDark: Bool { colorScheme == .dark }
+    private var backgroundColor: Color { isDark ? Color.black.opacity(0.92) : Color(red: 0.96, green: 0.96, blue: 0.98) }
+    private var panelColor: Color { isDark ? Color.black.opacity(0.25) : Color.white.opacity(0.7) }
+    private var primaryText: Color { isDark ? Color.white.opacity(0.9) : Color.black.opacity(0.85) }
+    private var secondaryText: Color { isDark ? Color.white.opacity(0.6) : Color.black.opacity(0.55) }
+    private var chipBackground: Color { isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.06) }
+    private var chipText: Color { isDark ? Color.white.opacity(0.8) : Color.black.opacity(0.7) }
+
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
         } detail: {
             ZStack {
-                Color.black.opacity(0.92).ignoresSafeArea()
+                backgroundColor.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     topBar
@@ -71,7 +80,7 @@ struct ContentView: View {
         HStack {
             Text(selection.rawValue)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(primaryText)
             Spacer()
             HStack(spacing: 8) {
                 Chip(text: store.settings.rotationMinutes == 0 ? "不轮换" : "\(store.settings.rotationMinutes) 分钟")
@@ -122,10 +131,10 @@ struct ContentView: View {
         .coordinateSpace(name: "scroll")
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.25))
+                .fill(panelColor)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(isDropTargeted ? Color.blue.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(isDropTargeted ? Color.blue.opacity(0.4) : (isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)), lineWidth: 1)
                 )
                 .padding(12)
         )
@@ -146,22 +155,22 @@ struct ContentView: View {
             Button("移除选中") { removeSelection() }
                 .disabled(selectedID == nil)
                 .buttonStyle(.borderedProminent)
-                .tint(.white.opacity(0.18))
+                .tint(isDark ? .white.opacity(0.18) : .black.opacity(0.08))
             Button("清空") { store.settings.items.removeAll() }
                 .disabled(store.settings.items.isEmpty)
                 .buttonStyle(.bordered)
             Toggle("随机播放", isOn: $store.settings.shuffle)
                 .toggleStyle(.switch)
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(isDark ? Color.white.opacity(0.8) : Color.black.opacity(0.75))
             Toggle("开机自启", isOn: $store.settings.launchAtLogin)
                 .toggleStyle(.switch)
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(isDark ? Color.white.opacity(0.8) : Color.black.opacity(0.75))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(
-            Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1)
+            Capsule().stroke(isDark ? Color.white.opacity(0.15) : Color.black.opacity(0.08), lineWidth: 1)
         )
     }
 
@@ -310,14 +319,15 @@ private struct SidebarRow: View {
 
 private struct Chip: View {
     let text: String
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Color.white.opacity(0.08), in: Capsule())
-            .foregroundStyle(.white.opacity(0.8))
+            .background(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06), in: Capsule())
+            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.8) : Color.black.opacity(0.7))
     }
 }
 
@@ -326,13 +336,13 @@ private struct EmptyStateView: View {
         VStack(spacing: 12) {
             Image(systemName: "photo.on.rectangle")
                 .font(.system(size: 36))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Color.primary.opacity(0.6))
             Text("拖拽图片或视频到这里")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(Color.primary.opacity(0.9))
             Text("支持文件夹导入与批量添加")
                 .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Color.primary.opacity(0.6))
         }
         .frame(maxWidth: .infinity)
         .padding(20)
@@ -346,58 +356,70 @@ private struct PhotoTile: View {
     let onSelect: () -> Void
     let onDelete: () -> Void
     let onToggleFavorite: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topLeading) {
-                Image(nsImage: ThumbnailProvider.shared.thumbnail(for: item.url, size: CGSize(width: 220, height: 150)))
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 120)
-                    .clipped()
-                    .cornerRadius(10)
-
-                HStack {
-                    Button(action: onToggleFavorite) {
-                        Image(systemName: item.isFavorite ? "star.fill" : "star")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(item.isFavorite ? Color.yellow : Color.white.opacity(0.8))
-                            .padding(6)
-                            .background(.black.opacity(0.45), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(6)
-
-                    Spacer()
-
-                    if item.kind == .video {
-                        Text("0:06")
-                            .font(.system(size: 10, weight: .semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(.black.opacity(0.6), in: Capsule())
-                            .padding(6)
-                    }
-                }
-            }
-
-            Text(item.url.lastPathComponent)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
-                .lineLimit(1)
+            thumbnailView
+            titleView
         }
         .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(isSelected ? 0.18 : (isHovered ? 0.12 : 0.06)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? Color.blue.opacity(0.7) : Color.white.opacity(0.08), lineWidth: 1)
-                )
-        )
+        .background(cardBackground)
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.12), value: isHovered)
         .onTapGesture { onSelect() }
+    }
+
+    private var thumbnailView: some View {
+        ZStack(alignment: .topLeading) {
+            Image(nsImage: ThumbnailProvider.shared.thumbnail(for: item.url, size: CGSize(width: 220, height: 150)))
+                .resizable()
+                .scaledToFill()
+                .frame(height: 120)
+                .clipped()
+                .cornerRadius(10)
+
+            HStack {
+                Button(action: onToggleFavorite) {
+                    Image(systemName: item.isFavorite ? "star.fill" : "star")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(item.isFavorite ? Color.yellow : Color.white.opacity(0.8))
+                        .padding(6)
+                        .background((colorScheme == .dark ? Color.black.opacity(0.45) : Color.white.opacity(0.8)), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(6)
+
+                Spacer()
+
+                if item.kind == .video {
+                    Text("0:06")
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background((colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.85)), in: Capsule())
+                        .padding(6)
+                }
+            }
+        }
+    }
+
+    private var titleView: some View {
+        Text(item.url.lastPathComponent)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.85) : Color.black.opacity(0.8))
+            .lineLimit(1)
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(colorScheme == .dark
+                  ? Color.white.opacity(isSelected ? 0.18 : (isHovered ? 0.12 : 0.06))
+                  : Color.black.opacity(isSelected ? 0.08 : (isHovered ? 0.06 : 0.03)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.blue.opacity(0.7) : (colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)), lineWidth: 1)
+            )
     }
 }
 
