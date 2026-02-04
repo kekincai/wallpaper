@@ -1,0 +1,22 @@
+.DS_Store
+
+# SwiftPM
+.build/
+DerivedData/
+.swiftpm/
+Package.resolved
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# Logs
+*.log
+
+# App bundles / generated assets
+WallpaperApp.app/
+Assets/AppIcon.iconset/
+Assets/AppIcon.png
+Assets/make_icon.swift
+.vscode/
