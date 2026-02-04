@@ -2,6 +2,8 @@
 
 原生 macOS SwiftUI 壁纸应用，支持本地图片/视频、定时轮换、多显示器、开机自启。
 
+![App Screenshot](Assets/screenshot.png)
+
 ## 依赖
 - macOS 14+
 - Xcode 15+（或 Swift 5.9+ 的 SwiftPM）
@@ -101,4 +103,3 @@ codesign --force --deep --sign - WallpaperApp.app
 ## 说明
 - UI 使用系统 `Material` 实现玻璃质感，后续可替换为 macOS 26 的液态玻璃 API。
 - 多显示器与多桌面空间已支持。
-
