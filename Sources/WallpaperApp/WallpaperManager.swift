@@ -80,14 +80,12 @@ final class WallpaperManager: ObservableObject {
         timer?.invalidate()
         timer = nil
 
-        let minutes = settingsStore.settings.rotationMinutes
-        if minutes <= 0 { return }
-
-        if let manualID = manualOverrideID,
-           let item = settingsStore.settings.items.first(where: { $0.id == manualID }),
-           item.kind == .video {
+        if manualOverrideID != nil {
             return
         }
+
+        let minutes = settingsStore.settings.rotationMinutes
+        if minutes <= 0 { return }
 
         let clamped = max(1, minutes)
         timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(clamped * 60), repeats: true) { [weak self] _ in
@@ -129,12 +127,20 @@ final class WallpaperManager: ObservableObject {
         }
 
         windows.values.forEach { $0.updateMedia(item: nextItem) }
-        scheduleTimer()
+        if manualOverrideID == nil {
+            scheduleTimer()
+        }
     }
 
     func setManualItem(id: UUID?) {
         manualOverrideID = id
         applyCurrentItem()
+        if id == nil {
+            scheduleTimer()
+        } else {
+            timer?.invalidate()
+            timer = nil
+        }
     }
 
     private func screenID(_ screen: NSScreen) -> UInt32 {

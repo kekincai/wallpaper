@@ -107,10 +107,12 @@ struct ContentView: View {
 
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(filteredItems) { item in
+                        let isValid = FileManager.default.fileExists(atPath: item.url.path)
                         PhotoTile(
                             item: item,
                             isSelected: selectedID == item.id,
                             isHovered: hoveredID == item.id,
+                            isValid: isValid,
                             onSelect: { selectItem(item) },
                             onDelete: { removeItem(item) },
                             onToggleFavorite: { toggleFavorite(item) }
@@ -120,6 +122,7 @@ struct ContentView: View {
                         }
                         .contextMenu {
                             Button("设为当前") { selectItem(item) }
+                                .disabled(!isValid)
                             Button(item.isFavorite ? "取消精选" : "加入精选") { toggleFavorite(item) }
                             Button("删除") { removeItem(item) }
                         }
@@ -225,6 +228,7 @@ struct ContentView: View {
     }
 
     private func selectItem(_ item: WallpaperItem) {
+        guard FileManager.default.fileExists(atPath: item.url.path) else { return }
         selectedID = item.id
         WallpaperManager.shared.setManualItem(id: item.id)
     }
@@ -353,6 +357,7 @@ private struct PhotoTile: View {
     let item: WallpaperItem
     let isSelected: Bool
     let isHovered: Bool
+    let isValid: Bool
     let onSelect: () -> Void
     let onDelete: () -> Void
     let onToggleFavorite: () -> Void
@@ -367,7 +372,7 @@ private struct PhotoTile: View {
         .background(cardBackground)
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.12), value: isHovered)
-        .onTapGesture { onSelect() }
+        .onTapGesture { if isValid { onSelect() } }
     }
 
     private var thumbnailView: some View {
@@ -389,6 +394,7 @@ private struct PhotoTile: View {
                 }
                 .buttonStyle(.plain)
                 .padding(6)
+                .disabled(!isValid)
 
                 Spacer()
 
@@ -400,6 +406,14 @@ private struct PhotoTile: View {
                         .background((colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.85)), in: Capsule())
                         .padding(6)
                 }
+            }
+
+            if !isValid {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.black.opacity(0.55))
+                Text("文件不可用")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
             }
         }
     }
