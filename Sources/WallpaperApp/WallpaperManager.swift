@@ -126,7 +126,8 @@ final class WallpaperManager: ObservableObject {
             }
         }
 
-        windows.values.forEach { $0.updateMedia(item: nextItem) }
+        let resolved = resolveItem(nextItem)
+        windows.values.forEach { $0.updateMedia(item: resolved) }
         if manualOverrideID == nil {
             scheduleTimer()
         }
@@ -141,6 +142,15 @@ final class WallpaperManager: ObservableObject {
             timer?.invalidate()
             timer = nil
         }
+    }
+
+    private func resolveItem(_ item: WallpaperItem) -> WallpaperItem {
+        guard item.kind == .video else { return item }
+        let cached = CacheManager.shared.cachedURL(for: item.url)
+        if cached == item.url { return item }
+        var copy = item
+        copy.url = cached
+        return copy
     }
 
     private func screenID(_ screen: NSScreen) -> UInt32 {

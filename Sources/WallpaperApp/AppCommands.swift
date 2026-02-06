@@ -34,6 +34,10 @@ struct AppCommands: Commands {
         CommandMenu("偏好") {
             Toggle("随机播放", isOn: $store.settings.shuffle)
             Toggle("开机自启", isOn: $store.settings.launchAtLogin)
+            Divider()
+            Button("缓存设置…") {
+                NotificationCenter.default.post(name: .openPreferences, object: nil)
+            }
         }
     }
 }

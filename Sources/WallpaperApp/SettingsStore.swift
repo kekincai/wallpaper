@@ -5,19 +5,25 @@ struct AppSettings: Codable, Equatable {
     var rotationMinutes: Int
     var shuffle: Bool
     var launchAtLogin: Bool
+    var cacheMaxMB: Int
+    var cacheAutoClean: Bool
 
     static let `default` = AppSettings(
         items: [],
         rotationMinutes: 10,
         shuffle: true,
-        launchAtLogin: false
+        launchAtLogin: false,
+        cacheMaxMB: 2048,
+        cacheAutoClean: true
     )
 
-    init(items: [WallpaperItem], rotationMinutes: Int, shuffle: Bool, launchAtLogin: Bool) {
+    init(items: [WallpaperItem], rotationMinutes: Int, shuffle: Bool, launchAtLogin: Bool, cacheMaxMB: Int, cacheAutoClean: Bool) {
         self.items = items
         self.rotationMinutes = rotationMinutes
         self.shuffle = shuffle
         self.launchAtLogin = launchAtLogin
+        self.cacheMaxMB = cacheMaxMB
+        self.cacheAutoClean = cacheAutoClean
     }
 
     init(from decoder: Decoder) throws {
@@ -26,6 +32,8 @@ struct AppSettings: Codable, Equatable {
         rotationMinutes = try container.decodeIfPresent(Int.self, forKey: .rotationMinutes) ?? 10
         shuffle = try container.decodeIfPresent(Bool.self, forKey: .shuffle) ?? true
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+        cacheMaxMB = try container.decodeIfPresent(Int.self, forKey: .cacheMaxMB) ?? 2048
+        cacheAutoClean = try container.decodeIfPresent(Bool.self, forKey: .cacheAutoClean) ?? true
     }
 }
 

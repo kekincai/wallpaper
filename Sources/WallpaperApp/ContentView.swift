@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var selection: LibrarySection = .library
     @State private var showControls = true
     @State private var scrollDebounce: DispatchWorkItem?
+    @State private var showPreferences = false
 
     private let columns = [
         GridItem(.adaptive(minimum: 170), spacing: 16)
@@ -67,11 +68,17 @@ struct ContentView: View {
         }
         .onAppear {
             store.settings.launchAtLogin = LoginItemManager.isEnabled
+            NotificationCenter.default.addObserver(forName: .openPreferences, object: nil, queue: .main) { _ in
+                showPreferences = true
+            }
         }
         .onChange(of: store.settings.launchAtLogin) { _, newValue in
             if newValue != LoginItemManager.isEnabled {
                 LoginItemManager.setEnabled(newValue)
             }
+        }
+        .sheet(isPresented: $showPreferences) {
+            CachePreferencesView()
         }
         .frame(minWidth: 980, minHeight: 640)
     }
@@ -287,6 +294,10 @@ struct ContentView: View {
         scrollDebounce = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: workItem)
     }
+}
+
+extension Notification.Name {
+    static let openPreferences = Notification.Name("WallpaperApp.OpenPreferences")
 }
 
 private struct SidebarView: View {
