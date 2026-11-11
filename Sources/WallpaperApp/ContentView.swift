@@ -77,7 +77,11 @@ struct ContentView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            ToolbarItem(placement: .primaryAction) {
+            // Flexible space: keeps ＋ beside the search field instead of against the filter.
+            ToolbarItem(placement: .automatic) {
+                Spacer()
+            }
+            ToolbarItem(placement: .automatic) {
                 Button(action: LibraryActions.addFromOpenPanel) {
                     Label("添加壁纸", systemImage: "plus")
                 }
