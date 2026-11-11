@@ -38,6 +38,14 @@ final class CacheManager {
         }
     }
 
+    /// Total bytes currently held in the cache directory.
+    func currentSize() -> Int64 {
+        let files = (try? fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey], options: [])) ?? []
+        return files.reduce(0) { total, file in
+            total + Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+    }
+
     func cleanIfNeeded(force: Bool = false) {
         if !settings.settings.cacheAutoClean && !force { return }
         let maxBytes = Int64(settings.settings.cacheMaxMB) * 1024 * 1024

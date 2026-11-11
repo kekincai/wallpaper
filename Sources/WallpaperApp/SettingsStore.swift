@@ -7,6 +7,7 @@ struct AppSettings: Codable, Equatable {
     var launchAtLogin: Bool
     var cacheMaxMB: Int
     var cacheAutoClean: Bool
+    var showMenuBarIcon: Bool
 
     static let `default` = AppSettings(
         items: [],
@@ -14,16 +15,18 @@ struct AppSettings: Codable, Equatable {
         shuffle: true,
         launchAtLogin: false,
         cacheMaxMB: 2048,
-        cacheAutoClean: true
+        cacheAutoClean: true,
+        showMenuBarIcon: true
     )
 
-    init(items: [WallpaperItem], rotationMinutes: Int, shuffle: Bool, launchAtLogin: Bool, cacheMaxMB: Int, cacheAutoClean: Bool) {
+    init(items: [WallpaperItem], rotationMinutes: Int, shuffle: Bool, launchAtLogin: Bool, cacheMaxMB: Int, cacheAutoClean: Bool, showMenuBarIcon: Bool) {
         self.items = items
         self.rotationMinutes = rotationMinutes
         self.shuffle = shuffle
         self.launchAtLogin = launchAtLogin
         self.cacheMaxMB = cacheMaxMB
         self.cacheAutoClean = cacheAutoClean
+        self.showMenuBarIcon = showMenuBarIcon
     }
 
     init(from decoder: Decoder) throws {
@@ -34,6 +37,7 @@ struct AppSettings: Codable, Equatable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         cacheMaxMB = try container.decodeIfPresent(Int.self, forKey: .cacheMaxMB) ?? 2048
         cacheAutoClean = try container.decodeIfPresent(Bool.self, forKey: .cacheAutoClean) ?? true
+        showMenuBarIcon = try container.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon) ?? true
     }
 }
 

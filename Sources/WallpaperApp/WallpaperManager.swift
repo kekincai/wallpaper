@@ -5,11 +5,16 @@ import Combine
 final class WallpaperManager: ObservableObject {
     static let shared = WallpaperManager()
 
+    /// The library item currently shown on the desktop.
+    @Published private(set) var currentItemID: UUID?
+    /// Rotation is paused (manually, or because a wallpaper was picked by hand).
+    @Published private(set) var isPaused = false
+
     private var windows: [UInt32: WallpaperWindowController] = [:]
     private var timer: Timer?
     private var cancellables: Set<AnyCancellable> = []
-    private var currentIndex: Int = 0
-    private var manualOverrideID: UUID?
+    private var currentResolved: WallpaperItem?
+    private var started = false
 
     private let settingsStore = SettingsStore.shared
 
@@ -22,9 +27,40 @@ final class WallpaperManager: ObservableObject {
         )
     }
 
+    // MARK: - State
+
+    var currentItem: WallpaperItem? {
+        guard let currentItemID else { return nil }
+        return settingsStore.settings.items.first { $0.id == currentItemID }
+    }
+
+    /// Rotation can run at all (an interval is set).
+    var canRotate: Bool { settingsStore.settings.rotationMinutes > 0 }
+
+    /// e.g. "轮换中 · 随机顺序", "已暂停 · 每 10 分钟 · 顺序播放"
+    func statusText(includeInterval: Bool = false) -> String {
+        let settings = settingsStore.settings
+        guard currentItem != nil else {
+            return settings.items.isEmpty ? "图库为空" : "没有可用的壁纸"
+        }
+        var parts: [String] = []
+        if !canRotate {
+            parts.append("不轮换")
+        } else {
+            parts.append(isPaused ? "已暂停" : "轮换中")
+            if includeInterval { parts.append(RotationInterval.label(settings.rotationMinutes)) }
+        }
+        parts.append(settings.shuffle ? "随机顺序" : "顺序播放")
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: - Lifecycle
+
     func start() {
+        guard !started else { return }
+        started = true
         rebuildWindows()
-        applyCurrentItem()
+        show(pickNext())
         scheduleTimer()
         observeSettings()
     }
@@ -36,27 +72,71 @@ final class WallpaperManager: ObservableObject {
         windows.removeAll()
     }
 
+    // MARK: - Controls
+
+    /// Show the next wallpaper. Keeps the current paused/rotating state.
+    func advance() {
+        show(pickNext())
+        scheduleTimer()
+    }
+
+    func pause() {
+        isPaused = true
+        scheduleTimer()
+    }
+
+    func resume() {
+        isPaused = false
+        scheduleTimer()
+    }
+
+    func togglePause() {
+        isPaused ? resume() : pause()
+    }
+
+    /// Show a specific wallpaper. Picking one by hand pauses rotation.
+    func setWallpaper(id: UUID) {
+        guard let item = settingsStore.settings.items.first(where: { $0.id == id }),
+              item.isAvailable else { return }
+        show(item)
+        pause()
+    }
+
+    // MARK: - Private
+
     private func observeSettings() {
+        // @Published emits in willSet, so hop to the next main-queue turn to read the new value.
         settingsStore.$settings
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                self.scheduleTimer()
-                self.applyCurrentItem(resetIndex: true)
-            }
+            .map(\.rotationMinutes)
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.scheduleTimer() }
             .store(in: &cancellables)
+
+        settingsStore.$settings
+            .map { $0.items.map(\.id) }
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.libraryChanged() }
+            .store(in: &cancellables)
+    }
+
+    /// Items were added or removed: only switch if the current wallpaper is gone (or nothing is showing).
+    private func libraryChanged() {
+        if let item = currentItem, item.isAvailable { return }
+        show(pickNext())
     }
 
     @objc private func handleScreenChange() {
         rebuildWindows()
-        applyCurrentItem()
     }
 
     private func rebuildWindows() {
-        let screens = NSScreen.screens
         var next: [UInt32: WallpaperWindowController] = [:]
 
-        for screen in screens {
+        for screen in NSScreen.screens {
             let id = screenID(screen)
             if let existing = windows[id] {
                 existing.updateScreen(screen)
@@ -64,12 +144,12 @@ final class WallpaperManager: ObservableObject {
             } else {
                 let controller = WallpaperWindowController(screen: screen)
                 controller.show()
+                controller.updateMedia(item: currentResolved)
                 next[id] = controller
             }
         }
 
-        let removed = Set(windows.keys).subtracting(next.keys)
-        for id in removed {
+        for id in Set(windows.keys).subtracting(next.keys) {
             windows[id]?.hide()
         }
 
@@ -80,68 +160,35 @@ final class WallpaperManager: ObservableObject {
         timer?.invalidate()
         timer = nil
 
-        if manualOverrideID != nil {
-            return
-        }
-
         let minutes = settingsStore.settings.rotationMinutes
-        if minutes <= 0 { return }
+        guard !isPaused, minutes > 0 else { return }
 
-        let clamped = max(1, minutes)
-        timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(clamped * 60), repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes * 60), repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.advance()
             }
         }
     }
 
-    func advance() {
-        manualOverrideID = nil
-        applyCurrentItem()
-        scheduleTimer()
+    private func pickNext() -> WallpaperItem? {
+        let items = settingsStore.settings.items.filter(\.isAvailable)
+        guard !items.isEmpty else { return nil }
+
+        if settingsStore.settings.shuffle {
+            let pool = items.count > 1 ? items.filter { $0.id != currentItemID } : items
+            return pool.randomElement()
+        }
+
+        if let currentItemID, let index = items.firstIndex(where: { $0.id == currentItemID }) {
+            return items[(index + 1) % items.count]
+        }
+        return items.first
     }
 
-    private func applyCurrentItem(resetIndex: Bool = false) {
-        let items = settingsStore.settings.items.filter { FileManager.default.fileExists(atPath: $0.url.path) }
-        guard !items.isEmpty else {
-            windows.values.forEach { $0.updateMedia(item: nil) }
-            return
-        }
-
-        if resetIndex {
-            currentIndex = 0
-        }
-
-        let nextItem: WallpaperItem
-        if let manualID = manualOverrideID,
-           let manualItem = items.first(where: { $0.id == manualID }) {
-            nextItem = manualItem
-        } else {
-            if settingsStore.settings.shuffle {
-                nextItem = items.randomElement() ?? items[0]
-            } else {
-                if currentIndex >= items.count { currentIndex = 0 }
-                nextItem = items[currentIndex]
-                currentIndex += 1
-            }
-        }
-
-        let resolved = resolveItem(nextItem)
-        windows.values.forEach { $0.updateMedia(item: resolved) }
-        if manualOverrideID == nil {
-            scheduleTimer()
-        }
-    }
-
-    func setManualItem(id: UUID?) {
-        manualOverrideID = id
-        applyCurrentItem()
-        if id == nil {
-            scheduleTimer()
-        } else {
-            timer?.invalidate()
-            timer = nil
-        }
+    private func show(_ item: WallpaperItem?) {
+        currentItemID = item?.id
+        currentResolved = item.map(resolveItem)
+        windows.values.forEach { $0.updateMedia(item: currentResolved) }
     }
 
     private func resolveItem(_ item: WallpaperItem) -> WallpaperItem {
