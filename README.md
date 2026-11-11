@@ -65,6 +65,16 @@
 | 从图库移除（选中时） | Delete |
 | 设置 | ⌘, |
 
+## 下载
+
+从 [Releases](https://github.com/kekincai/wallpaper/releases/latest) 下载 `WallpaperApp-<版本>.zip`，解压后把 `WallpaperApp.app` 拖进“应用程序”文件夹。支持 Apple 芯片和 Intel，需要 macOS 14 及以上。
+
+应用使用 ad-hoc 签名、未经公证，第一次打开会被系统拦截。可以在“系统设置 › 隐私与安全性”里点“仍要打开”，或者在终端执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/WallpaperApp.app
+```
+
 ## 构建与运行
 
 需要 macOS 14 及以上，Xcode 15+ 或 Swift 5.9+ 工具链。
@@ -87,6 +97,7 @@ open WallpaperApp.app
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `CONFIG` | `release` 或 `debug` | `release` |
+| `UNIVERSAL` | 设为 `1` 时同时编译 arm64 和 x86_64 | 只编译本机架构 |
 | `VERSION` | 版本号 | 最近的 git tag，否则 `0.2.0` |
 | `SIGN_IDENTITY` | 签名身份，例如 `Developer ID Application: …` | `-`（ad-hoc） |
 

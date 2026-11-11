@@ -3,6 +3,7 @@
 #
 #   scripts/package.sh            # release build, ad-hoc signed
 #   CONFIG=debug scripts/package.sh
+#   UNIVERSAL=1 scripts/package.sh  # arm64 + x86_64
 #   SIGN_IDENTITY="Developer ID Application: …" scripts/package.sh
 set -euo pipefail
 
@@ -15,8 +16,12 @@ BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 APP="WallpaperApp.app"
 
-swift build --disable-sandbox -c "$CONFIG"
-BIN="$(swift build --disable-sandbox -c "$CONFIG" --show-bin-path)/WallpaperApp"
+BUILD_ARGS=(--disable-sandbox -c "$CONFIG")
+if [[ "${UNIVERSAL:-0}" == "1" ]]; then
+    BUILD_ARGS+=(--arch arm64 --arch x86_64)
+fi
+swift build "${BUILD_ARGS[@]}"
+BIN="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)/WallpaperApp"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -63,4 +68,4 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 codesign --force --deep --options runtime --sign "$SIGN_IDENTITY" "$APP"
-echo "Built $APP ($VERSION, build $BUILD, $CONFIG)"
+echo "Built $APP ($VERSION, build $BUILD, $CONFIG, $(lipo -archs "$APP/Contents/MacOS/WallpaperApp"))"
